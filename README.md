@@ -55,10 +55,26 @@ O gerente do bar percebe que a música atual não está animando os clientes. El
 ## In/OUT (3 pts)
 
 - Entradas Digitais: 3 botões coloridos
+   - Avança música: Push button azul
+     Racional: Usuário deve clicar esse botão uma vez para avançar para a próxima música
+
+   - Volta música: Push button vermelho
+     Racional: Usuário deve clicar esse botão uma vez para voltar uma música
+
+   - Pausa música: Push button verde
+     Racional: Usuário deve clicar esse botão uma vez para pausar a música
 
 - Entrada Analógica: 1 potenciômetro
 
 - Saída Digital: 3 LED's coloridos
+   - Led azul:
+     Racional: Acende quando o usuário avança a música
+
+   - Led vermelho:
+     Racional: Acende quando o usuário volta uma música
+
+   - Led verde:
+     Racional: Acende quando o usuário pausa a música
 
 ## Design (2 pts)
 ![Screenshot from 2023-09-29 18-31-45](https://github.com/insper-classroom/23b-emb-proj-engenheiros-do-hawaii/assets/92441863/75035412-aff8-434c-9004-8680a21a9431)
