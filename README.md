@@ -4,50 +4,60 @@ Desenvolvendo um controle remoto.
 
 ## Entrega 1
 
-### Integrantes
+## Integrantes
 
-- Nome1
-- Nome2
+- Arthur Tamm
+- Caio Bôa
 
-### Ideia
+## Ideia
 
-<!--  Descreva aqui em poucas palavras qual a ideia do seu controle. Se ele vai ser de jogo ou de aplicação -->
+Controlador para o Spotify
 
-### Nome
+## Nome
 
-<!-- De um nome ao seu controle! -->
+Engenheiros do Hawaii
 
-### Usuários 
+## Usuários 
 
-<!-- Descreva aqui quem seriam os possíveis usuários deste controle. -->
+- Estudantes que utilizam o Spotify desktop para escutar música enquanto estudam.
 
-### Software/Jogo 
+- Gerentes de bares e restaurantes que precisam controlar a música ambiente de maneira rápida e remota.
 
-<!-- Qual software que seu controle vai controlar? -->
+## Software/Jogo 
 
-### Jornada do usuários (3 pts)
+Spotify
 
-<!-- Descreva ao menos duas jornadas de usuários distintos, é para caprichar! -->
+## Jornada do usuário (3 pts)
 
-### Comandos/ Feedbacks (2 pts)
+### Jornada 1: Estudante Sozinho
 
-<!-- 
-Quais são os comandos/ operacões possíveis do seu controle?
+Um usuário do Spotify está estudando, resolvendo uma lista de exercícios em seu caderno enquanto escuta sua playlist no Spotify desktop. Em certo momento, deseja trocar de música mas não quer desviar o foco para abrir o Spotify. Então, apenas aperta o botão verde para ir para a próxima música, sem precisar de muito esforço e sem perder o embalo nos estudos! O controlador funcionará dessa forma, com o objetivo de reduzir a quantidade de vezes que o usuário deverá manualmente entrar no Spotify para controlar suas músicas, podendo pausar, dar play, pular para a próxima música, voltar para a música anterior ou até ajustar o volume!
 
-Quais os feedbacks que seu controle vai fornecer ao usuário?
--->
+### Jornada 2: Estudantes em grupo
+
+Em um ambiente de estudos em grupo, todos estão concentrados em suas tarefas. Um dos estudantes tem o controlador e ajusta o volume usando o potenciômetro, para que a música ambiente não perturbe os outros, mas ainda proporcione uma experiência agradável.
+
+### Jornada 3: Gerente de bar
+
+O gerente do bar percebe que a música atual não está animando os clientes. Ele usa o controlador para rapidamente mudar para uma faixa mais agitada, sem ter que se afastar do balcão ou interromper seu atendimento.
+
+## Comandos/ Feedbacks (2 pts)
+
+- Botão verde: passa para a próxima música e acende o led verde
+
+- Botão vermelho: reinicia a música quando clicado uma vez, volta para a música anterior quando clicado duas vezes e acende o led vermelho.
+
+- Botão azul: entra / sai do pause e acende o led azul
+
+- Potenciômetro: controla o volume
+
 
 ## In/OUT (3 pts)
 
-<!--
-Para cada Comando/ Feedback do seu controle, associe qual sensores/ atuadores pretende utilizar? Faca em formato de lista, exemplo:
+- Entradas Digitais: 3 botões coloridos
 
-- Avanca música: Push button amarelo
-- Volume da música: Fita de LED indicando potência do som
--->
+- Entrada Analógica: 1 potenciômetro
 
-### Design (2 pts)
+- Saída Digital: 3 LED's coloridos
 
-<!--
-Faca um esboco de como seria esse controle (vai ter uma etapa que terão que detalhar melhor isso).
--->
+## Design (2 pts)
