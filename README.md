@@ -57,9 +57,8 @@ O gerente do bar percebe que a música atual não está animando os clientes. El
 - Entradas Digitais: 3 botões coloridos
 
 - Entrada Analógica: 1 potenciômetro
-![Screenshot from 2023-09-29 18-31-45](https://github.com/insper-classroom/23b-emb-proj-engenheiros-do-hawaii/assets/92441863/75035412-aff8-434c-9004-8680a21a9431)
 
 - Saída Digital: 3 LED's coloridos
 
 ## Design (2 pts)
-
+![Screenshot from 2023-09-29 18-31-45](https://github.com/insper-classroom/23b-emb-proj-engenheiros-do-hawaii/assets/92441863/75035412-aff8-434c-9004-8680a21a9431)
