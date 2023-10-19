@@ -25,11 +25,26 @@
 #define BUT_IDX      11
 #define BUT_IDX_MASK (1 << BUT_IDX)
 
+#define BUT1_PIO PIOD  // Botão 1
+#define BUT1_PIO_ID ID_PIOD
+#define BUT1_PIO_IDX	28
+#define BUT1_PIO_IDX_MASK (1u << BUT1_PIO_IDX)
+
+#define BUT2_PIO PIOC // Botão 2
+#define BUT2_PIO_ID ID_PIOC
+#define BUT2_PIO_IDX 31
+#define BUT2_PIO_IDX_MASK (1u << BUT2_PIO_IDX)
+
+#define BUT3_PIO PIOA // Botão 3
+#define BUT3_PIO_ID ID_PIOA
+#define BUT3_PIO_IDX 19
+#define BUT3_PIO_IDX_MASK (1u << BUT3_PIO_IDX)
+
 // usart (bluetooth ou serial)
 // Descomente para enviar dados
 // pela serial debug
 
-//#define DEBUG_SERIAL
+#define DEBUG_SERIAL
 
 #ifdef DEBUG_SERIAL
 #define USART_COM USART1
@@ -57,6 +72,10 @@ extern void vApplicationTickHook(void);
 extern void vApplicationMallocFailedHook(void);
 extern void xPortSysTickHandler(void);
 
+void but1_callback(void);
+void but2_callback(void);
+void but3_callback(void);
+
 /************************************************************************/
 /* constants                                                            */
 /************************************************************************/
@@ -68,6 +87,10 @@ extern void xPortSysTickHandler(void);
 /************************************************************************/
 /* RTOS application HOOK                                                */
 /************************************************************************/
+
+SemaphoreHandle_t xSemaphoreBut1;
+SemaphoreHandle_t xSemaphoreBut2;
+SemaphoreHandle_t xSemaphoreBut3;
 
 /* Called if stack overflow during execution */
 extern void vApplicationStackOverflowHook(xTaskHandle *pxTask,
@@ -116,6 +139,56 @@ void io_init(void) {
 	// Configura Pinos
 	pio_configure(LED_PIO, PIO_OUTPUT_0, LED_IDX_MASK, PIO_DEFAULT | PIO_DEBOUNCE);
 	pio_configure(BUT_PIO, PIO_INPUT, BUT_IDX_MASK, PIO_PULLUP);
+}
+
+void BUT_init(void){
+	// Disativa WatchDog Timer
+	WDT->WDT_MR = WDT_MR_WDDIS;
+
+	// Inicializa clock do periférico PIO responsavel pelo botao
+	pmc_enable_periph_clk(BUT1_PIO_ID);
+    pmc_enable_periph_clk(BUT2_PIO_ID);
+	pmc_enable_periph_clk(BUT3_PIO_ID);
+
+	// Configura PIO para lidar com o pino do botão como entrada
+	// com pull-up
+
+	pio_configure(BUT1_PIO, PIO_INPUT, BUT1_PIO_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
+	pio_set_debounce_filter(BUT1_PIO, BUT1_PIO_IDX_MASK, 60);
+
+    pio_configure(BUT2_PIO, PIO_INPUT, BUT2_PIO_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
+	pio_set_debounce_filter(BUT2_PIO, BUT2_PIO_IDX_MASK, 60);
+
+	pio_configure(BUT3_PIO, PIO_INPUT, BUT3_PIO_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
+	pio_set_debounce_filter(BUT3_PIO, BUT3_PIO_IDX_MASK, 60);
+
+	pio_handler_set(BUT1_PIO, BUT1_PIO_ID, BUT1_PIO_IDX_MASK, PIO_IT_EDGE, but1_callback);
+
+    pio_handler_set(BUT2_PIO, BUT2_PIO_ID, BUT2_PIO_IDX_MASK, PIO_IT_EDGE, but2_callback);
+
+	pio_handler_set(BUT3_PIO, BUT3_PIO_ID, BUT3_PIO_IDX_MASK, PIO_IT_EDGE, but3_callback);
+
+	// Ativa interrupção e limpa primeira IRQ gerada na ativacao
+	pio_enable_interrupt(BUT1_PIO, BUT1_PIO_IDX_MASK);
+	pio_get_interrupt_status(BUT1_PIO);
+
+    pio_enable_interrupt(BUT2_PIO, BUT2_PIO_IDX_MASK);
+	pio_get_interrupt_status(BUT2_PIO);
+
+	pio_enable_interrupt(BUT3_PIO, BUT3_PIO_IDX_MASK);
+	pio_get_interrupt_status(BUT3_PIO);
+
+	// Configura NVIC para receber interrupcoes do PIO do botao
+	// com prioridade 4 (quanto mais próximo de 0 maior)
+
+	NVIC_EnableIRQ(BUT1_PIO_ID);
+	NVIC_SetPriority(BUT1_PIO_ID, 4);
+
+    NVIC_EnableIRQ(BUT2_PIO_ID);
+	NVIC_SetPriority(BUT2_PIO_ID, 4);
+
+	NVIC_EnableIRQ(BUT3_PIO_ID);
+	NVIC_SetPriority(BUT3_PIO_ID, 4);
 }
 
 static void configure_console(void) {
@@ -201,11 +274,27 @@ int hc05_init(void) {
 	vTaskDelay( 500 / portTICK_PERIOD_MS);
 	usart_send_command(USART_COM, buffer_rx, 1000, "AT", 100);
 	vTaskDelay( 500 / portTICK_PERIOD_MS);
-	usart_send_command(USART_COM, buffer_rx, 1000, "AT+NAMEagoravai", 100);
+	usart_send_command(USART_COM, buffer_rx, 1000, "AT+NAMEHawaii", 100);
 	vTaskDelay( 500 / portTICK_PERIOD_MS);
 	usart_send_command(USART_COM, buffer_rx, 1000, "AT", 100);
 	vTaskDelay( 500 / portTICK_PERIOD_MS);
-	usart_send_command(USART_COM, buffer_rx, 1000, "AT+PIN0000", 100);
+	usart_send_command(USART_COM, buffer_rx, 1000, "AT+PINVSCO", 100);
+}
+
+void but1_callback(void){
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	xSemaphoreGiveFromISR(xSemaphoreBut1, &xHigherPriorityTaskWoken);
+	//printf("but1_callback\n");
+}
+
+void but2_callback(void){
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	xSemaphoreGiveFromISR(xSemaphoreBut2, &xHigherPriorityTaskWoken);
+}
+
+void but3_callback(void){ 
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	xSemaphoreGiveFromISR(xSemaphoreBut3, &xHigherPriorityTaskWoken);
 }
 
 /************************************************************************/
@@ -222,32 +311,70 @@ void task_bluetooth(void) {
 	// configura LEDs e Botões
 	io_init();
 
+	char button = '0';
 	char button1 = '0';
+	char button2 = '0';
+	char button3 = '0';
 	char eof = 'X';
+	char state = 0;
+	char last_state = 0;
 
 	// Task não deve retornar.
 	while(1) {
 		// atualiza valor do botão
-		if(pio_get(BUT_PIO, PIO_INPUT, BUT_IDX_MASK) == 0) {
-			button1 = '1';
-		} else {
-			button1 = '0';
+		// if(pio_get(BUT_PIO, PIO_INPUT, BUT_IDX_MASK) == 0) {
+		// 	button = '1';
+		// } else {
+		// 	button = '0';
+		// }
+
+		if (xSemaphoreTake(xSemaphoreBut1, 1)) {
+			if (state & 1) {
+				// state |= (0 << 0);
+				state -= 1;
+			} else {
+				// state |= (1 << 0);
+				state += 1;
+			}
 		}
 
-		// envia status botão
-		while(!usart_is_tx_ready(USART_COM)) {
-			vTaskDelay(10 / portTICK_PERIOD_MS);
+		if(xSemaphoreTake(xSemaphoreBut2, 1)) {
+			if (state & 2){
+				// state |= (0 << 1);
+				state -= 2;
+			} else{
+				// state |= (1 << 1);
+				state += 2;
+			}
 		}
-		usart_write(USART_COM, button1);
+
+		if(xSemaphoreTake(xSemaphoreBut3, 1)) {
+			if (state & 4){
+				// state |= (0 << 2);
+				state -= 4;
+			} else{
+				// state |= (1 << 2);
+				state += 4;
+			}
+		}
+		// envia status 
+		if (state != last_state){
+			while(!usart_is_tx_ready(USART_COM)) {
+			vTaskDelay(1 / portTICK_PERIOD_MS);
+			}
+			usart_write(USART_COM, state);
+			
+			// envia fim de pacote
+			while(!usart_is_tx_ready(USART_COM)) {
+				vTaskDelay(1 / portTICK_PERIOD_MS);
+			}
+			usart_write(USART_COM, eof);
+			last_state = state;
+		}
 		
-		// envia fim de pacote
-		while(!usart_is_tx_ready(USART_COM)) {
-			vTaskDelay(10 / portTICK_PERIOD_MS);
-		}
-		usart_write(USART_COM, eof);
 
 		// dorme por 500 ms
-		vTaskDelay(500 / portTICK_PERIOD_MS);
+		vTaskDelay(1 / portTICK_PERIOD_MS);
 	}
 }
 
@@ -259,8 +386,21 @@ int main(void) {
 	/* Initialize the SAM system */
 	sysclk_init();
 	board_init();
+	BUT_init();
 
 	configure_console();
+
+	xSemaphoreBut1 = xSemaphoreCreateBinary();
+	if (xSemaphoreBut1 == NULL)
+		printf("falha em criar o semaforo do botao 1\n");
+	
+	xSemaphoreBut2 = xSemaphoreCreateBinary();
+	if (xSemaphoreBut2 == NULL)
+		printf("falha em criar o semaforo do botao 2\n");
+	
+	xSemaphoreBut3 = xSemaphoreCreateBinary();
+	if (xSemaphoreBut3 == NULL)
+		printf("falha em criar o semaforo do botao 3\n");
 
 	/* Create task to make led blink */
 	xTaskCreate(task_bluetooth, "BLT", TASK_BLUETOOTH_STACK_SIZE, NULL,	TASK_BLUETOOTH_STACK_PRIORITY, NULL);

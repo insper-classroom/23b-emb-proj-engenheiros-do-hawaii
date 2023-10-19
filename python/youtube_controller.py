@@ -20,21 +20,52 @@ class SerialControllerInterface:
         pyautogui.PAUSE = 0  ## remove delay
     
     def update(self):
+
+        # list of dicts with commands info
+        commands = [['ctrl', 'left'], 'space', ['ctrl', 'right']]
+
         ## Sync protocol
         while self.incoming != b'X':
             self.incoming = self.ser.read()
             logging.debug("Received INCOMING: {}".format(self.incoming))
 
+        # for i in range(len(commands)):
+        #     data = self.ser.read()
+        #     logging.debug("Received DATA: {}".format(data))
+
+        #     if i == 1:
+        #         if data == b'1':
+        #             logging.info("KEYDOWN {}".format(commands[i]))
+        #             pyautogui.press(commands[i])
+        #         # elif data == b'0':
+        #         #     logging.info("KEYUP {}".format(commands[i]))
+        #         #     pyautogui.keyUp(commands[i])
+        #     else:
+        #         if data == b'1':
+        #             logging.info("KEYDOWN {}".format(commands[i]))
+        #             pyautogui.hotkey(commands[i][0], commands[i][1]) # Press the Ctrl-C hotkey combination.
+                    
         data = self.ser.read()
+        # convert data to binary with 8 bits
+        #data = bin(int.from_bytes(data, byteorder='big'))
+        # data = bin(int.from_bytes(data, byteorder='big'))
         logging.debug("Received DATA: {}".format(data))
 
-        if data == b'1':
-            logging.info("KEYDOWN A")
-            pyautogui.keyDown(self.mapping.button['A'])
-        elif data == b'0':
-            logging.info("KEYUP A")
-            pyautogui.keyUp(self.mapping.button['A'])
+        primeiro_byte = data[0]
+        primeiro_bit = primeiro_byte & 1
 
+        if primeiro_bit == 1:
+            logging.debug("bt0")
+
+        
+
+        # if data == b'1':
+        #     logging.info("KEYDOWN A")
+        #     pyautogui.keyDown(self.mapping.button['A'])
+        # elif data == b'0':
+        #     logging.info("KEYUP A")
+        #     pyautogui.keyUp(self.mapping.button['A'])
+        
         self.incoming = self.ser.read()
 
 
