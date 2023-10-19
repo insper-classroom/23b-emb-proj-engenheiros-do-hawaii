@@ -46,7 +46,7 @@
 
 QueueHandle_t xQueueLMFAO;
 struct {
-	char id;
+	short id;
 	char on;
 }typedef Instruction;
 
@@ -78,6 +78,7 @@ extern void vApplicationTickHook(void);
 extern void vApplicationMallocFailedHook(void);
 extern void xPortSysTickHandler(void);
 
+void but0_callback(void);
 void but1_callback(void);
 void but2_callback(void);
 void but3_callback(void);
@@ -136,11 +137,9 @@ void io_init(void) {
 
 	// Ativa PIOs
 	pmc_enable_periph_clk(LED_PIO_ID);
-	pmc_enable_periph_clk(BUT_PIO_ID);
 
 	// Configura Pinos
 	pio_configure(LED_PIO, PIO_OUTPUT_0, LED_IDX_MASK, PIO_DEFAULT | PIO_DEBOUNCE);
-	pio_configure(BUT_PIO, PIO_INPUT, BUT_IDX_MASK, PIO_PULLUP);
 }
 
 void BUT_init(void){
@@ -148,12 +147,16 @@ void BUT_init(void){
 	WDT->WDT_MR = WDT_MR_WDDIS;
 
 	// Inicializa clock do periférico PIO responsavel pelo botao
+	pmc_enable_periph_clk(BUT_PIO_ID);
 	pmc_enable_periph_clk(BUT1_PIO_ID);
     pmc_enable_periph_clk(BUT2_PIO_ID);
 	pmc_enable_periph_clk(BUT3_PIO_ID);
 
 	// Configura PIO para lidar com o pino do botão como entrada
 	// com pull-up
+	
+	pio_configure(BUT_PIO, PIO_INPUT, BUT_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
+	pio_set_debounce_filter(BUT_PIO, BUT_IDX_MASK, 60);
 
 	pio_configure(BUT1_PIO, PIO_INPUT, BUT1_PIO_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
 	pio_set_debounce_filter(BUT1_PIO, BUT1_PIO_IDX_MASK, 60);
@@ -163,6 +166,8 @@ void BUT_init(void){
 
 	pio_configure(BUT3_PIO, PIO_INPUT, BUT3_PIO_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
 	pio_set_debounce_filter(BUT3_PIO, BUT3_PIO_IDX_MASK, 60);
+	
+	pio_handler_set(BUT_PIO, BUT_PIO_ID, BUT_IDX_MASK, PIO_IT_EDGE, but0_callback);
 
 	pio_handler_set(BUT1_PIO, BUT1_PIO_ID, BUT1_PIO_IDX_MASK, PIO_IT_EDGE, but1_callback);
 
@@ -171,6 +176,10 @@ void BUT_init(void){
 	pio_handler_set(BUT3_PIO, BUT3_PIO_ID, BUT3_PIO_IDX_MASK, PIO_IT_EDGE, but3_callback);
 
 	// Ativa interrupção e limpa primeira IRQ gerada na ativacao
+	
+	pio_enable_interrupt(BUT_PIO, BUT_IDX_MASK);
+	pio_get_interrupt_status(BUT_PIO);
+	
 	pio_enable_interrupt(BUT1_PIO, BUT1_PIO_IDX_MASK);
 	pio_get_interrupt_status(BUT1_PIO);
 
@@ -183,6 +192,9 @@ void BUT_init(void){
 	// Configura NVIC para receber interrupcoes do PIO do botao
 	// com prioridade 4 (quanto mais próximo de 0 maior)
 
+	NVIC_EnableIRQ(BUT_PIO_ID);
+	NVIC_SetPriority(BUT_PIO_ID, 4);
+	
 	NVIC_EnableIRQ(BUT1_PIO_ID);
 	NVIC_SetPriority(BUT1_PIO_ID, 4);
 
@@ -281,6 +293,17 @@ int hc05_init(void) {
 	usart_send_command(USART_COM, buffer_rx, 1000, "AT", 100);
 	vTaskDelay( 500 / portTICK_PERIOD_MS);
 	usart_send_command(USART_COM, buffer_rx, 1000, "AT+PINVSCO", 100);
+}
+
+
+void but0_callback(void){
+	if (pio_get(BUT_PIO, PIO_INPUT, BUT_IDX_MASK)){
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+		Instruction inst;
+		inst.id = 8;
+		inst.on = 1;
+		xQueueSendFromISR(xQueueLMFAO, &inst, xHigherPriorityTaskWoken);
+	}
 }
 
 void but1_callback(void){

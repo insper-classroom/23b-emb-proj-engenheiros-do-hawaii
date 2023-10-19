@@ -28,15 +28,24 @@ class SerialControllerInterface:
                     
         data = self.ser.read()
         data = data[0]
+        print(data)
+
+        #voltar
         if data & 1:
             print("botao 1")
             pyautogui.hotkey('ctrl', 'left')
+        #pausar
         if data & 2:
             print("botao 2")
             pyautogui.press('space')
+        #pular
         if data & 4:
             print("botao 3")
             pyautogui.hotkey('ctrl', 'right')
+        #like
+        if data & 8:
+            print("botao 0")
+            pyautogui.hotkey('alt', 'shift', 'b')
         
 
         # if data == b'1':
