@@ -44,6 +44,12 @@
 // Descomente para enviar dados
 // pela serial debug
 
+QueueHandle_t xQueueLMFAO;
+struct {
+	char id;
+	char on;
+}typedef Instruction;
+
 #define DEBUG_SERIAL
 
 #ifdef DEBUG_SERIAL
@@ -87,10 +93,6 @@ void but3_callback(void);
 /************************************************************************/
 /* RTOS application HOOK                                                */
 /************************************************************************/
-
-SemaphoreHandle_t xSemaphoreBut1;
-SemaphoreHandle_t xSemaphoreBut2;
-SemaphoreHandle_t xSemaphoreBut3;
 
 /* Called if stack overflow during execution */
 extern void vApplicationStackOverflowHook(xTaskHandle *pxTask,
@@ -282,19 +284,33 @@ int hc05_init(void) {
 }
 
 void but1_callback(void){
+	if (pio_get(BUT1_PIO, PIO_INPUT, BUT1_PIO_IDX_MASK)){
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	xSemaphoreGiveFromISR(xSemaphoreBut1, &xHigherPriorityTaskWoken);
-	//printf("but1_callback\n");
+	Instruction inst;
+	inst.id = 1;
+	inst.on = 1;
+	xQueueSendFromISR(xQueueLMFAO, &inst, xHigherPriorityTaskWoken);	
+	}
 }
 
 void but2_callback(void){
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	xSemaphoreGiveFromISR(xSemaphoreBut2, &xHigherPriorityTaskWoken);
+	if (pio_get(BUT2_PIO, PIO_INPUT, BUT2_PIO_IDX_MASK)){
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+		Instruction inst;
+		inst.id = 2;
+		inst.on = 1;
+		xQueueSendFromISR(xQueueLMFAO, &inst, xHigherPriorityTaskWoken);
+	}
 }
 
 void but3_callback(void){ 
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	xSemaphoreGiveFromISR(xSemaphoreBut3, &xHigherPriorityTaskWoken);
+	if (pio_get(BUT3_PIO, PIO_INPUT, BUT3_PIO_IDX_MASK)){
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+		Instruction inst;
+		inst.id = 4;
+		inst.on = 1;
+		xQueueSendFromISR(xQueueLMFAO, &inst, xHigherPriorityTaskWoken);
+	}
 }
 
 /************************************************************************/
@@ -308,74 +324,29 @@ void task_bluetooth(void) {
 	config_usart0();
 	hc05_init();
 
-	// configura LEDs e Botões
 	io_init();
 
-	char button = '0';
-	char button1 = '0';
-	char button2 = '0';
-	char button3 = '0';
 	char eof = 'X';
-	char state = 0;
-	char last_state = 0;
+	Instruction msg;
 
-	// Task não deve retornar.
 	while(1) {
-		// atualiza valor do botão
-		// if(pio_get(BUT_PIO, PIO_INPUT, BUT_IDX_MASK) == 0) {
-		// 	button = '1';
-		// } else {
-		// 	button = '0';
-		// }
-
-		if (xSemaphoreTake(xSemaphoreBut1, 1)) {
-			if (state & 1) {
-				// state |= (0 << 0);
-				state -= 1;
-			} else {
-				// state |= (1 << 0);
-				state += 1;
-			}
-		}
-
-		if(xSemaphoreTake(xSemaphoreBut2, 1)) {
-			if (state & 2){
-				// state |= (0 << 1);
-				state -= 2;
-			} else{
-				// state |= (1 << 1);
-				state += 2;
-			}
-		}
-
-		if(xSemaphoreTake(xSemaphoreBut3, 1)) {
-			if (state & 4){
-				// state |= (0 << 2);
-				state -= 4;
-			} else{
-				// state |= (1 << 2);
-				state += 4;
-			}
-		}
-		// envia status 
-		if (state != last_state){
-			while(!usart_is_tx_ready(USART_COM)) {
-			vTaskDelay(1 / portTICK_PERIOD_MS);
-			}
-			usart_write(USART_COM, state);
-			
-			// envia fim de pacote
+		if (xQueueReceive(xQueueLMFAO, &msg, (TickType_t) 0)){
+			char id = msg.id;
+			char on = msg.on;
 			while(!usart_is_tx_ready(USART_COM)) {
 				vTaskDelay(1 / portTICK_PERIOD_MS);
 			}
 			usart_write(USART_COM, eof);
-			last_state = state;
+			
+			while(!usart_is_tx_ready(USART_COM)) {
+			vTaskDelay(1 / portTICK_PERIOD_MS);
+			}
+			usart_write(USART_COM, id);
+			
+			}
 		}
 		
-
-		// dorme por 500 ms
 		vTaskDelay(1 / portTICK_PERIOD_MS);
-	}
 }
 
 /************************************************************************/
@@ -389,18 +360,7 @@ int main(void) {
 	BUT_init();
 
 	configure_console();
-
-	xSemaphoreBut1 = xSemaphoreCreateBinary();
-	if (xSemaphoreBut1 == NULL)
-		printf("falha em criar o semaforo do botao 1\n");
-	
-	xSemaphoreBut2 = xSemaphoreCreateBinary();
-	if (xSemaphoreBut2 == NULL)
-		printf("falha em criar o semaforo do botao 2\n");
-	
-	xSemaphoreBut3 = xSemaphoreCreateBinary();
-	if (xSemaphoreBut3 == NULL)
-		printf("falha em criar o semaforo do botao 3\n");
+	xQueueLMFAO = xQueueCreate(32, sizeof(Instruction));
 
 	/* Create task to make led blink */
 	xTaskCreate(task_bluetooth, "BLT", TASK_BLUETOOTH_STACK_SIZE, NULL,	TASK_BLUETOOTH_STACK_PRIORITY, NULL);
