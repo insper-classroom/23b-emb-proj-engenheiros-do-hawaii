@@ -58,11 +58,11 @@ QueueHandle_t xQueueAFEC;
 TimerHandle_t xTimer;
 
 struct {
-	int id;
-	int on;
+	char id;
+	char value;
 }typedef Instruction;
 
-#define DEBUG_SERIAL
+//#define DEBUG_SERIAL
 
 #ifdef DEBUG_SERIAL
 #define USART_COM USART1
@@ -374,7 +374,7 @@ void but0_callback(void){
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 		Instruction inst;
 		inst.id = 8;
-		inst.on = 1;
+		inst.value = 1;
 		xQueueSendFromISR(xQueueLMFAO, &inst, xHigherPriorityTaskWoken);
 	}
 }
@@ -384,17 +384,17 @@ void but1_callback(void){
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	Instruction inst;
 	inst.id = 1;
-	inst.on = 1;
+	inst.value = 1;
 	xQueueSendFromISR(xQueueLMFAO, &inst, xHigherPriorityTaskWoken);	
 	}
 }
 
-void but2_callback(void){
+void but2_callback(void) {
 	if (pio_get(BUT2_PIO, PIO_INPUT, BUT2_PIO_IDX_MASK)){
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 		Instruction inst;
 		inst.id = 2;
-		inst.on = 1;
+		inst.value = 1;
 		xQueueSendFromISR(xQueueLMFAO, &inst, xHigherPriorityTaskWoken);
 	}
 }
@@ -404,7 +404,7 @@ void but3_callback(void){
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 		Instruction inst;
 		inst.id = 4;
-		inst.on = 1;
+		inst.value = 1;
 		xQueueSendFromISR(xQueueLMFAO, &inst, xHigherPriorityTaskWoken);
 	}
 }
@@ -425,26 +425,15 @@ void task_process(void){
 	
 	config_AFEC_pot(AFEC_POT, AFEC_POT_ID, AFEC_POT_CHANNEL, AFEC_pot_callback);
 	int oldmsg = 0;
-	int values[10];
 	int msg;
 	
 	while(1){
 		if(xQueueReceive(xQueueAFEC, &msg, (TickType_t) 0)){
-			if ((msg - oldmsg) > 5){
-				values[9] = values[8];
-				values[8] = values[7];
-				values[7] = values[6];
-				values[6] = values[5];
-				values[5] = values[4];
-				values[4] = values[3];
-				values[3] = values[2];
-				values[2] = values[1];
-				values[1] = values[0];
-				values[0] = msg;
-				int mean = (values[0] + values[1] + values[2] + values[3] + values[4] + values[5] + values[6] + values[7] + values[8] + values[9])/10;
+			if ((msg - oldmsg) > 10){
+				char vol = (msg*100)/4095;
 				Instruction afec;
 				afec.id = 16;
-				afec.on = mean;
+				afec.value = vol;
 				BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 				xQueueSendFromISR(xQueueLMFAO, &afec, &xHigherPriorityTaskWoken);
 			}
@@ -455,6 +444,8 @@ void task_process(void){
 }
 
 void task_bluetooth(void) {
+	char Handshake = 0;
+	uint32_t var = 0;
 	printf("Task Bluetooth started \n");
 	
 	printf("Inicializando HC05 \n");
@@ -462,32 +453,43 @@ void task_bluetooth(void) {
 	hc05_init();
 
 	io_init();
-
+	
+	char hs = 'A';
 	char eof = 'X';
 	Instruction msg;
 
 	while(1) {
-		if (xQueueReceive(xQueueLMFAO, &msg, (TickType_t) 0)){
-				int id = msg.id;
-				int on = msg.on;
-				while(!usart_is_tx_ready(USART_COM)) {
-					vTaskDelay(1 / portTICK_PERIOD_MS);
-				}
-				usart_write(USART_COM, eof);
-				
-				while(!usart_is_tx_ready(USART_COM)) {
-					vTaskDelay(1 / portTICK_PERIOD_MS);
-				}
-				usart_write(USART_COM, id);
-				
-				while(!usart_is_tx_ready(USART_COM)) {
-					vTaskDelay(1 / portTICK_PERIOD_MS);
-				}
-				usart_write(USART_COM, on);
-			
+		while (Handshake != 'A'){
+			while(!usart_is_tx_ready(USART_COM)) {
+				vTaskDelay(1 / portTICK_PERIOD_MS);
 			}
-		vTaskDelay(1 / portTICK_PERIOD_MS);
+			usart_write(USART_COM, hs);
+			
+			usart_read(USART_COM, &Handshake);
+			printf("Enviando Handshake\n");
 		}
+		if (xQueueReceive(xQueueLMFAO, &msg, (TickType_t) 0)){
+			char id = msg.id;
+			char value = msg.value;
+			
+			while(!usart_is_tx_ready(USART_COM)) {
+				vTaskDelay(1 / portTICK_PERIOD_MS);
+			}
+			usart_write(USART_COM, id);
+			
+			while(!usart_is_tx_ready(USART_COM)) {
+				vTaskDelay(1 / portTICK_PERIOD_MS);
+			}
+			usart_write(USART_COM, value);
+
+			while(!usart_is_tx_ready(USART_COM)) {
+				vTaskDelay(1 / portTICK_PERIOD_MS);
+			}
+			usart_write(USART_COM, eof);
+			
+		}
+		vTaskDelay(1 / portTICK_PERIOD_MS);
+	}
 		
 }
 
@@ -502,8 +504,8 @@ int main(void) {
 	BUT_init();
 
 	configure_console();
-	xQueueLMFAO = xQueueCreate(32, sizeof(Instruction));
-	xQueueAFEC =  xQueueCreate(32, sizeof(int));
+	xQueueLMFAO = xQueueCreate(4, sizeof(Instruction));
+	xQueueAFEC =  xQueueCreate(1, sizeof(int));
 
 	/* Create task to make led blink */
 	xTaskCreate(task_bluetooth, "BLT", TASK_BLUETOOTH_STACK_SIZE, NULL,	TASK_BLUETOOTH_STACK_PRIORITY, NULL);

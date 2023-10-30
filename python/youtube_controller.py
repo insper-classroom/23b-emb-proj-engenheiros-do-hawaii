@@ -48,60 +48,71 @@ class SerialControllerInterface:
         self.ser = serial.Serial(port, baudrate=baudrate)
         self.mapping = MyControllerMap()
         self.incoming = '0'
+        self.Handshake = False
         pyautogui.PAUSE = 0  ## remove delay
-    
+
     def update(self):
 
-        ## Sync protocol
-        while self.incoming != b'X':
+        if self.Handshake == False:
+            while self.incoming != b'A':
+                self.incoming = self.ser.read()
+                logging.debug("Received INCOMING: {}".format(self.incoming))
+
+            self.Handshake = True
+            print("Handshake OK")
+            self.ser.write(b'A')
+
+        if self.Handshake:
+            ## Sync protocol
+            print("HandShaked")
+            while self.incoming != b'X':
+                self.incoming = self.ser.read()
+                logging.debug("Received INCOMING: {}".format(self.incoming))
+
+                        
+            datas = self.ser.read()
+            data = datas[0]
+
+            #voltar
+            if data & 1:
+                print("botao 1")
+                pyautogui.hotkey('ctrl', 'left')
+            #pausar
+            if data & 2:
+                print("botao 2")
+                pyautogui.press('space')
+            #pular
+            if data & 4:
+                print("botao 3")
+                pyautogui.hotkey('ctrl', 'right')
+            #like
+            if data & 8:
+                print("botao 0")
+                pyautogui.hotkey('alt', 'shift', 'b')
+
+            #volume
+            if data == 16:
+                data = self.ser.read()
+                print("data0 ", data[0])
+                vol = data[0]/100
+                print("volume 0 ",vol)
+
+                if vol < 0:
+                    vol = 0
+                if vol > 1:
+                    vol = 1
+
+                print("Volume = ",vol)
+
+                for value in volume2decibal:
+                    if vol - 0.025 < value:
+                        vol = volume2decibal[value]
+                        break
+                print("Decibels = ",vol)
+
+                volume.SetMasterVolumeLevel(vol, None)
+            
             self.incoming = self.ser.read()
-            logging.debug("Received INCOMING: {}".format(self.incoming))
-                    
-        datas = self.ser.read()
-        data = datas[0]
-
-        #voltar
-        if data & 1:
-            print("botao 1")
-            pyautogui.hotkey('ctrl', 'left')
-        #pausar
-        if data & 2:
-            print("botao 2")
-            pyautogui.press('space')
-        #pular
-        if data & 4:
-            print("botao 3")
-            pyautogui.hotkey('ctrl', 'right')
-        #like
-        if data & 8:
-            print("botao 0")
-            pyautogui.hotkey('alt', 'shift', 'b')
-
-        #volume
-        # if data & 16:
-            # i = 0
-            # while(i < 8):
-            #     data = self.ser.read()
-            #     print(data)
-            #     i += 1
-
-            # vol = data[0]*0.005- 0.1
-
-            # if vol < 0:
-            #     vol = 0
-            # if vol > 1:
-            #     vol = 1
-            # print("Volume = ",vol)
-
-            # for value in volume2decibal:
-            #     if vol - 0.025 < value:
-            #         vol = volume2decibal[value]
-            #         break
-            # print("Decibels = ",vol)
-
-            #volume.SetMasterVolumeLevel(vol, None)
-        
-        self.incoming = self.ser.read()
 
 
 class DummyControllerInterface:
