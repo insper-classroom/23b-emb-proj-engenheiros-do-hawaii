@@ -14,10 +14,19 @@
 /************************************************************************/
 
 // LEDs
-#define LED_PIO      PIOC
-#define LED_PIO_ID   ID_PIOC
-#define LED_IDX      8
+#define LED_PIO      PIOA
+#define LED_PIO_ID   ID_PIOA
+#define LED_IDX      6
 #define LED_IDX_MASK (1 << LED_IDX)
+
+// AFEC
+#define AFEC_POT AFEC0
+#define AFEC_POT_ID ID_AFEC0
+#define AFEC_POT_CHANNEL 0 // Canal do pino PD30
+
+#define AFEC_POT2 AFEC1
+#define AFEC_POT2_ID ID_AFEC1
+#define AFEC_POT2_CHANNEL 6 // Canal do pino PD30
 
 // Botão
 #define BUT_PIO      PIOA
@@ -45,9 +54,12 @@
 // pela serial debug
 
 QueueHandle_t xQueueLMFAO;
+QueueHandle_t xQueueAFEC;
+TimerHandle_t xTimer;
+
 struct {
-	short id;
-	char on;
+	int id;
+	int on;
 }typedef Instruction;
 
 #define DEBUG_SERIAL
@@ -266,6 +278,52 @@ char buffer_tx[], int timeout) {
 	usart_get_string(usart, buffer_rx, bufferlen, timeout);
 }
 
+static void config_AFEC_pot(Afec *afec, uint32_t afec_id, uint32_t afec_channel,
+                            afec_callback_t callback) {
+  /*************************************
+   * Ativa e configura AFEC
+   *************************************/
+  /* Ativa AFEC - 0 */
+  afec_enable(afec);
+
+  /* struct de configuracao do AFEC */
+  struct afec_config afec_cfg;
+
+  /* Carrega parametros padrao */
+  afec_get_config_defaults(&afec_cfg);
+
+  /* Configura AFEC */
+  afec_init(afec, &afec_cfg);
+
+  /* Configura trigger por software */
+  afec_set_trigger(afec, AFEC_TRIG_SW);
+
+  /*** Configuracao específica do canal AFEC ***/
+  struct afec_ch_config afec_ch_cfg;
+  afec_ch_get_config_defaults(&afec_ch_cfg);
+  afec_ch_cfg.gain = AFEC_GAINVALUE_0;
+  afec_ch_set_config(afec, afec_channel, &afec_ch_cfg);
+
+  /*
+  * Calibracao:
+  * Because the internal ADC offset is 0x200, it should cancel it and shift
+  down to 0.
+  */
+  afec_channel_set_analog_offset(afec, afec_channel, 0x200);
+
+  /***  Configura sensor de temperatura ***/
+  struct afec_temp_sensor_config afec_temp_sensor_cfg;
+
+  afec_temp_sensor_get_config_defaults(&afec_temp_sensor_cfg);
+  afec_temp_sensor_set_config(afec, &afec_temp_sensor_cfg);
+
+  /* configura IRQ */
+  afec_set_callback(afec, afec_channel, callback, 1);
+  NVIC_SetPriority(afec_id, 4);
+  NVIC_EnableIRQ(afec_id);
+}
+
+
 void config_usart0(void) {
 	sysclk_enable_peripheral_clock(ID_USART0);
 	usart_serial_options_t config;
@@ -295,6 +353,21 @@ int hc05_init(void) {
 	usart_send_command(USART_COM, buffer_rx, 1000, "AT+PINVSCO", 100);
 }
 
+void vTimerCallback(TimerHandle_t xTimer) {
+	
+	afec_channel_enable(AFEC_POT, AFEC_POT_CHANNEL);
+	afec_start_software_conversion(AFEC_POT);
+	
+}
+
+static void AFEC_pot_callback(void) {
+	BaseType_t xHigherPriorityTaskWoken = pdTRUE;
+	
+	int adc;
+	adc = afec_channel_get_value(AFEC_POT, AFEC_POT_CHANNEL);
+	xQueueSendFromISR(xQueueAFEC, &adc, &xHigherPriorityTaskWoken);
+	
+}
 
 void but0_callback(void){
 	if (pio_get(BUT_PIO, PIO_INPUT, BUT_IDX_MASK)){
@@ -339,6 +412,47 @@ void but3_callback(void){
 /************************************************************************/
 /* TASKS                                                                */
 /************************************************************************/
+void task_process(void){
+	
+	xTimer = xTimerCreate(
+	"Timer",
+	100,
+	pdTRUE,
+	(void *)0,
+	/* Timer callback */
+	vTimerCallback);
+	xTimerStart(xTimer, 0);
+	
+	config_AFEC_pot(AFEC_POT, AFEC_POT_ID, AFEC_POT_CHANNEL, AFEC_pot_callback);
+	int oldmsg = 0;
+	int values[10];
+	int msg;
+	
+	while(1){
+		if(xQueueReceive(xQueueAFEC, &msg, (TickType_t) 0)){
+			if ((msg - oldmsg) > 5){
+				values[9] = values[8];
+				values[8] = values[7];
+				values[7] = values[6];
+				values[6] = values[5];
+				values[5] = values[4];
+				values[4] = values[3];
+				values[3] = values[2];
+				values[2] = values[1];
+				values[1] = values[0];
+				values[0] = msg;
+				int mean = (values[0] + values[1] + values[2] + values[3] + values[4] + values[5] + values[6] + values[7] + values[8] + values[9])/10;
+				Instruction afec;
+				afec.id = 16;
+				afec.on = mean;
+				BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+				xQueueSendFromISR(xQueueLMFAO, &afec, &xHigherPriorityTaskWoken);
+			}
+			oldmsg = msg;
+		}
+		vTaskDelay(1 / portTICK_PERIOD_MS);
+	}
+}
 
 void task_bluetooth(void) {
 	printf("Task Bluetooth started \n");
@@ -354,22 +468,27 @@ void task_bluetooth(void) {
 
 	while(1) {
 		if (xQueueReceive(xQueueLMFAO, &msg, (TickType_t) 0)){
-			char id = msg.id;
-			char on = msg.on;
-			while(!usart_is_tx_ready(USART_COM)) {
-				vTaskDelay(1 / portTICK_PERIOD_MS);
-			}
-			usart_write(USART_COM, eof);
+				int id = msg.id;
+				int on = msg.on;
+				while(!usart_is_tx_ready(USART_COM)) {
+					vTaskDelay(1 / portTICK_PERIOD_MS);
+				}
+				usart_write(USART_COM, eof);
+				
+				while(!usart_is_tx_ready(USART_COM)) {
+					vTaskDelay(1 / portTICK_PERIOD_MS);
+				}
+				usart_write(USART_COM, id);
+				
+				while(!usart_is_tx_ready(USART_COM)) {
+					vTaskDelay(1 / portTICK_PERIOD_MS);
+				}
+				usart_write(USART_COM, on);
 			
-			while(!usart_is_tx_ready(USART_COM)) {
-			vTaskDelay(1 / portTICK_PERIOD_MS);
 			}
-			usart_write(USART_COM, id);
-			
-			}
+		vTaskDelay(1 / portTICK_PERIOD_MS);
 		}
 		
-		vTaskDelay(1 / portTICK_PERIOD_MS);
 }
 
 /************************************************************************/
@@ -384,9 +503,11 @@ int main(void) {
 
 	configure_console();
 	xQueueLMFAO = xQueueCreate(32, sizeof(Instruction));
+	xQueueAFEC =  xQueueCreate(32, sizeof(int));
 
 	/* Create task to make led blink */
 	xTaskCreate(task_bluetooth, "BLT", TASK_BLUETOOTH_STACK_SIZE, NULL,	TASK_BLUETOOTH_STACK_PRIORITY, NULL);
+	xTaskCreate(task_process, "PROC", TASK_BLUETOOTH_STACK_SIZE, NULL, TASK_BLUETOOTH_STACK_PRIORITY, NULL);
 
 	/* Start the scheduler. */
 	vTaskStartScheduler();
