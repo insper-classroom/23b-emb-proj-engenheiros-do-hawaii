@@ -254,11 +254,11 @@ static void configure_console(void) {
 	const usart_serial_options_t uart_serial_options = {
 		.baudrate = CONF_UART_BAUDRATE,
 		#if (defined CONF_UART_CHAR_LENGTH)
-		.charlength = CONF_UART_CHAR_LENGTH,
+		// .charlength = CONF_UART_CHAR_LENGTH,
 		#endif
 		.paritytype = CONF_UART_PARITY,
 		#if (defined CONF_UART_STOP_BITS)
-		.stopbits = CONF_UART_STOP_BITS,
+		// .stopbits = CONF_UART_STOP_BITS,
 		#endif
 	};
 
@@ -276,7 +276,7 @@ static void configure_console(void) {
 }
 
 uint32_t usart_puts(uint8_t *pstring) {
-	uint32_t i ;
+	uint32_t i = 0;
 
 	while(*(pstring + i))
 	if(uart_is_tx_empty(USART_COM))
@@ -499,12 +499,12 @@ void task_bluetooth(void) {
 				usart_read(USART_COM, &Handshake);
 			}
 		if (xQueueReceive(xQueueInst, &msg, (TickType_t) 0)){
-				char id2 = msg.id;
-				char value2 = msg.value;
+				char msg_id = msg.id;
+				char msg_value = msg.value;
 				
-				send_package(id2);
+				send_package(msg_id);
 				
-				send_package(value2);
+				send_package(msg_value);
 
 				send_package(eof);
 		}
