@@ -243,6 +243,13 @@ void BUT_init(void){
 	NVIC_SetPriority(BUTR_PIO_ID, 4);
 }
 
+void send_package(char package){
+	while(!usart_is_tx_ready(USART_COM)) {
+		vTaskDelay(1 / portTICK_PERIOD_MS);
+	}
+	usart_write(USART_COM, package);
+}
+
 static void configure_console(void) {
 	const usart_serial_options_t uart_serial_options = {
 		.baudrate = CONF_UART_BAUDRATE,
@@ -487,31 +494,19 @@ void task_bluetooth(void) {
 
 	while(1) {
 		while (Handshake != 'A'){
-				while(!usart_is_tx_ready(USART_COM)) {
-					vTaskDelay(1 / portTICK_PERIOD_MS);
-				}
-				usart_write(USART_COM, hs);
+				send_package(hs);
 				
 				usart_read(USART_COM, &Handshake);
 			}
 		if (xQueueReceive(xQueueInst, &msg, (TickType_t) 0)){
-				char id = msg.id;
-				char value = msg.value;
+				char id2 = msg.id;
+				char value2 = msg.value;
 				
-				while(!usart_is_tx_ready(USART_COM)) {
-					vTaskDelay(1 / portTICK_PERIOD_MS);
-				}
-				usart_write(USART_COM, id);
+				send_package(id2);
 				
-				while(!usart_is_tx_ready(USART_COM)) {
-					vTaskDelay(1 / portTICK_PERIOD_MS);
-				}
-				usart_write(USART_COM, value);
+				send_package(value2);
 
-				while(!usart_is_tx_ready(USART_COM)) {
-					vTaskDelay(1 / portTICK_PERIOD_MS);
-				}
-				usart_write(USART_COM, eof);
+				send_package(eof);
 		}
 		if (xSemaphoreTake(xBLedSemaphore, 0)) {
 			sleep += 1;

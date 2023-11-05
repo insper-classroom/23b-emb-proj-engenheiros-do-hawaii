@@ -61,9 +61,10 @@ class SerialControllerInterface:
                     logging.debug("Handskahe Not Done: {}".format(self.incoming))
                 self.Handshake = True
                 self.ser.write(b'A')
+                self.incoming = b'X'
 
             if self.Handshake:
-                ## Sync protocol
+                ## Sync protocol 
                 while self.incoming != b'X':
                     self.incoming = self.ser.read()
                     logging.debug("Handshake Done: {}".format(self.incoming))
