@@ -55,44 +55,45 @@ class SerialControllerInterface:
     def update(self):
         if not self.sleep:
             if self.Handshake == False:
-                while self.incoming != b'A':
+                while self.incoming != b'X':
                     self.incoming = self.ser.read()
-                    logging.debug("Received INCOMING: {}".format(self.incoming))
-
-                self.Handshake = True
-                print("Handshake OK")
-                self.ser.write(b'A')
+                    logging.debug("Handskahe Not Done: {}".format(self.incoming))
+                    if self.incoming == b'\x04':
+                        self.sleep = True
+                        self.ser.write(b'A')
+                    if self.incoming == b'A':
+                        self.Handshake = True
+                        self.ser.write(b'A')
 
             if self.Handshake:
                 ## Sync protocol
-                print("HandShaked")
                 while self.incoming != b'X':
                     self.incoming = self.ser.read()
-                    logging.debug("Received INCOMING: {}".format(self.incoming))
+                    logging.debug("Handshake Done: {}".format(self.incoming))
 
                             
                 datas = self.ser.read()
                 data = datas[0]
 
                 #voltar
-                if data & 1:
+                if data == 1:
                     print("botao 1")
                     pyautogui.hotkey('ctrl', 'left')
                 #pausar
-                if data & 2:
+                if data == 2:
                     print("botao 2")
                     pyautogui.press('space')
                 #pular
-                if data & 4:
+                if data == 3:
                     print("botao 3")
                     pyautogui.hotkey('ctrl', 'right')
                 #sleep
-                if data & 8:
-                    print("botao 0")
+                if data == 4:
+                    print("botao 4")
                     self.sleep = True
 
                 #volume
-                if data == 16:
+                if data == 5:
                     data = self.ser.read()
                     print("data0 ", data[0])
                     vol = data[0]/100
@@ -117,15 +118,16 @@ class SerialControllerInterface:
         else:
             while self.incoming != b'X':
                 self.incoming = self.ser.read()
-                logging.debug("Received INCOMING: {}".format(self.incoming))
+                logging.debug("Sleep: {}".format(self.incoming))
       
-                datas = self.ser.read()
-                data = datas[0]
+            datas = self.ser.read()
+            data = datas[0]
 
-                #sleep
-                if data & 8:
-                    print("botao 0")
-                    self.sleep = False
+            #sleep
+            if data == 4:
+                print("botao")
+                self.sleep = False
+                self.Handshake = False
 
 
 

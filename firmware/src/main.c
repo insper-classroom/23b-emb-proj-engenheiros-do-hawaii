@@ -398,7 +398,7 @@ static void AFEC_pot_callback(void) {
 void butB_callback(void){
 	// if (pio_get(BUTB_PIO, PIO_INPUT, BUTB_IDX_MASK)){
 		Instruction inst;
-		inst.id = 8;
+		inst.id = 4;
 		inst.value = 1;
 		xQueueSendFromISR(xQueueInst, &inst, 0);
 
@@ -435,7 +435,7 @@ void butY_callback(void) {
 void butR_callback(void){ 
 	// if (pio_get(BUTR_PIO, PIO_INPUT, BUTR_PIO_IDX_MASK)){
 		Instruction inst;
-		inst.id = 4;
+		inst.id = 3;
 		inst.value = 1;
 		xQueueSendFromISR(xQueueInst, &inst, 0);
 
@@ -467,7 +467,7 @@ void task_process(void){
 			if ((msg - oldmsg) > 10){
 				char vol = (msg*100)/4095;
 				Instruction afec;
-				afec.id = 16;
+				afec.id = 5;
 				afec.value = vol;
 				xQueueSendFromISR(xQueueInst, &afec, 0);
 			}
@@ -478,8 +478,7 @@ void task_process(void){
 }
 
 void task_bluetooth(void) {
-	char Handshake = 0;
-	uint32_t var = 0;
+
 	printf("Task Bluetooth started \n");
 	
 	printf("Inicializando HC05 \n");
@@ -491,29 +490,24 @@ void task_bluetooth(void) {
 	char hs = 'A';
 	char eof = 'X';
 	Instruction msg;
-	int sleep = 0;
+	char Handshake = 0;
+	char sleep = 1;
 
 	while(1) {
-		if (xSemaphoreTake(xBLedSemaphore, 0)) {
-			sleep = !sleep;
-			if (sleep){
-				pio_set(LEDB_PIO, LEDB_IDX_MASK);
-			}
-			else{
-				pio_clear(LEDB_PIO, LEDB_IDX_MASK);
-			}
-		}
-		if (!sleep) {
-			while (Handshake != 'A'){
+		while (Handshake != 'A'){
 				while(!usart_is_tx_ready(USART_COM)) {
 					vTaskDelay(1 / portTICK_PERIOD_MS);
 				}
 				usart_write(USART_COM, hs);
 				
+				while(!usart_is_tx_ready(USART_COM)) {
+					vTaskDelay(1 / portTICK_PERIOD_MS);
+				}
+				usart_write(USART_COM, eof);
+				
 				usart_read(USART_COM, &Handshake);
-				printf("Enviando Handshake\n");
 			}
-			if (xQueueReceive(xQueueInst, &msg, (TickType_t) 0)){
+		if (xQueueReceive(xQueueInst, &msg, (TickType_t) 0)){
 				char id = msg.id;
 				char value = msg.value;
 				
@@ -531,7 +525,16 @@ void task_bluetooth(void) {
 					vTaskDelay(1 / portTICK_PERIOD_MS);
 				}
 				usart_write(USART_COM, eof);
-				
+		}
+		if (xSemaphoreTake(xBLedSemaphore, 0)) {
+			sleep += 1;
+			if (sleep & 2) {
+			pio_set(LEDB_PIO, LEDB_IDX_MASK);
+			printf("b");
+			} else {
+			Handshake = 0;
+			pio_clear(LEDB_PIO, LEDB_IDX_MASK);
+			printf("a");
 			}
 		}
 		
@@ -561,7 +564,7 @@ void task_led(void) {
 			vTaskDelay(500 / portTICK_PERIOD_MS);
 			pio_clear(LEDR_PIO, LEDR_IDX_MASK);
 		}
-
+		vTaskDelay(500 / portTICK_PERIOD_MS);
 	}
 }
 /************************************************************************/
@@ -576,6 +579,7 @@ int main(void) {
 	xYLedSemaphore = xSemaphoreCreateBinary();
 	xRLedSemaphore = xSemaphoreCreateBinary();
 	xBLedSemaphore = xSemaphoreCreateBinary();
+
 
 	sysclk_init();
 	board_init();
