@@ -53,17 +53,14 @@ class SerialControllerInterface:
         pyautogui.PAUSE = 0  ## remove delay
 
     def update(self):
-        if not self.sleep:
+        if self.sleep == False:
             if self.Handshake == False:
-                while self.incoming != b'X':
+                while self.incoming != b'A':
                     self.incoming = self.ser.read()
+                    print("Dentro ",self.incoming)
                     logging.debug("Handskahe Not Done: {}".format(self.incoming))
-                    if self.incoming == b'\x04':
-                        self.sleep = True
-                        self.ser.write(b'A')
-                    if self.incoming == b'A':
-                        self.Handshake = True
-                        self.ser.write(b'A')
+                self.Handshake = True
+                self.ser.write(b'A')
 
             if self.Handshake:
                 ## Sync protocol
@@ -128,6 +125,7 @@ class SerialControllerInterface:
                 print("botao")
                 self.sleep = False
                 self.Handshake = False
+                self.incoming = self.ser.read()
 
 
 

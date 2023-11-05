@@ -403,7 +403,6 @@ void butB_callback(void){
 		xQueueSendFromISR(xQueueInst, &inst, 0);
 
 		xSemaphoreGiveFromISR(xBLedSemaphore, 0);
-		printf("Botao B pressionado \n");
 	// }
 }
 
@@ -415,8 +414,6 @@ void butG_callback(void){
 	xSemaphoreGiveFromISR(xGLedSemaphore, 0);
 	
 	xQueueSendFromISR(xQueueInst, &inst, 0);	
-	
-	printf("Botao G pressionado \n");
 	// }
 }
 
@@ -428,7 +425,6 @@ void butY_callback(void) {
 		xQueueSendFromISR(xQueueInst, &inst, 0);
 
 		xSemaphoreGiveFromISR(xYLedSemaphore, 0);
-		printf("Botao Y pressionado \n");
 	// }
 }
 
@@ -440,7 +436,6 @@ void butR_callback(void){
 		xQueueSendFromISR(xQueueInst, &inst, 0);
 
 		xSemaphoreGiveFromISR(xRLedSemaphore, 0);
-		printf("Botao R pressionado \n");
 	// }
 }
 
@@ -479,9 +474,6 @@ void task_process(void){
 
 void task_bluetooth(void) {
 
-	printf("Task Bluetooth started \n");
-	
-	printf("Inicializando HC05 \n");
 	config_usart0();
 	hc05_init();
 
@@ -499,11 +491,6 @@ void task_bluetooth(void) {
 					vTaskDelay(1 / portTICK_PERIOD_MS);
 				}
 				usart_write(USART_COM, hs);
-				
-				while(!usart_is_tx_ready(USART_COM)) {
-					vTaskDelay(1 / portTICK_PERIOD_MS);
-				}
-				usart_write(USART_COM, eof);
 				
 				usart_read(USART_COM, &Handshake);
 			}
@@ -528,13 +515,11 @@ void task_bluetooth(void) {
 		}
 		if (xSemaphoreTake(xBLedSemaphore, 0)) {
 			sleep += 1;
-			if (sleep & 2) {
+			if (!(sleep % 2)) {
 			pio_set(LEDB_PIO, LEDB_IDX_MASK);
-			printf("b");
 			} else {
-			Handshake = 0;
 			pio_clear(LEDB_PIO, LEDB_IDX_MASK);
-			printf("a");
+			Handshake = 0;
 			}
 		}
 		
